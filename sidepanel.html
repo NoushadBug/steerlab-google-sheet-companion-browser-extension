@@ -11,10 +11,29 @@
   <div>
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-lg font-semibold">Sidebar for Google Sheets</h1>
-      <button id="clearCellIndex" class="bg-red-500 text-white px-2 py-1 rounded-full">Clear</button>
+      <button id="clearRanges" class="bg-red-500 text-white px-2 py-1 rounded-full">Clear</button>
     </div>
-    <div>
-      <p>Current Cell: <span id="currentCell"></span></p>
+
+    <div class="flex flex-col space-y-4">
+      <!-- Input Range -->
+      <div class="flex items-center space-x-2">
+        <label for="inputRange" class="text-sm font-medium">Input Range:</label>
+        <input id="inputRange" type="text" class="border border-gray-300 px-2 py-1 rounded flex-1" readonly>
+        <button id="selectInputRange" class="bg-blue-500 text-white px-3 py-1 rounded">Select</button>
+      </div>
+
+      <!-- Output Range -->
+      <div class="flex items-center space-x-2">
+        <label for="outputRange" class="text-sm font-medium">Output Range:</label>
+        <input id="outputRange" type="text" class="border border-gray-300 px-2 py-1 rounded flex-1" readonly>
+        <button id="selectOutputRange" class="bg-blue-500 text-white px-3 py-1 rounded">Select</button>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <button id="processRanges" class="bg-green-500 text-white px-4 py-2 rounded w-full">
+        Process AI Task
+      </button>
     </div>
   </div>
 </body>
