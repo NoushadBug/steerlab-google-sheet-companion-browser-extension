@@ -1,0 +1,50 @@
+{
+  "manifest_version": 3,
+  "name": "Google Sheets Companion",
+  "version": "1.0",
+  "description": "Open a sidebar on Google Sheets",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "runtime",
+    "sidePanel"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "action": {
+    "default_title": "Click to open panel"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://docs.google.com/spreadsheets/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles/sidebar.css"
+      ]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "scripts/alpine.min.js",
+        "styles/tailwind.min.css",
+        "scripts/sidepanel.js",
+        "content.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self';"
+  }
+}
