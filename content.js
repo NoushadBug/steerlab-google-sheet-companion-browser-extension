@@ -139,6 +139,75 @@ async function simulateValueSet(value) {
     }
 }
 
+function clickTabByName(tabName) {
+    const tabNames = document.querySelectorAll('.docs-sheet-tab .docs-sheet-tab-name');
+
+    for (let i = 0; i < tabNames.length; i++) {
+        const nameElement = tabNames[i];
+
+        // Check if the name matches
+        if (nameElement.textContent.trim() === tabName.trim()) {
+            const parentTab = nameElement.closest('.docs-sheet-tab'); // Find the parent .docs-sheet-tab
+
+            if (parentTab) {
+                // Simulate mouse move
+                const mouseMoveEvent = new MouseEvent('mousemove', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                parentTab.dispatchEvent(mouseMoveEvent);
+
+                // Simulate mouse over
+                const mouseOverEvent = new MouseEvent('mouseover', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                parentTab.dispatchEvent(mouseOverEvent);
+
+                // Simulate mousedown
+                const mouseDownEvent = new MouseEvent('mousedown', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                parentTab.dispatchEvent(mouseDownEvent);
+
+                // Simulate mouseup
+                const mouseUpEvent = new MouseEvent('mouseup', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                parentTab.dispatchEvent(mouseUpEvent);
+
+                // Simulate click
+                const clickEvent = new MouseEvent('click', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                parentTab.dispatchEvent(clickEvent);
+
+                // Simulate mouseout
+                const mouseOutEvent = new MouseEvent('mouseout', {
+                    bubbles: true,
+                    cancelable: true,
+                    view: window
+                });
+                parentTab.dispatchEvent(mouseOutEvent);
+
+                console.log(`Clicked tab: ${tabName}`);
+                return; // Exit the function after clicking the desired tab
+            }
+        }
+    }
+
+    console.error(`Tab with name "${tabName}" not found!`);
+}
+
+
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -147,8 +216,18 @@ console.log("Google Sheets Sidebar Extension Loaded");
 
 
 // Listener for incoming messages
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === "getCurrentCellIndex") {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "sheetSelected") {
+        clickTabByName(message.sheetName);
+    }
+
+    if (message.type === "getSheetNames") {
+        const tabs = Array.from(document.querySelectorAll('.docs-sheet-tab .docs-sheet-tab-name'))
+            .map(tab => tab.textContent);
+        sendResponse({ sheetNames: tabs });
+    }
+
+    if (message.action === "getCurrentCellIndex") {
         const cellIndex = getCurrentCellIndex();
         sendResponse({ cellIndex });
     }

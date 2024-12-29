@@ -27,13 +27,29 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
 });
 
 
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "getCurrentCellIndex") {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      chrome.tabs.sendMessage(tabs[0].id, { action: "getCurrentCellIndex" }, (response) => {
-        sendResponse(response);
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "sheetSelected") {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          chrome.tabs.sendMessage(tabs[0].id, message);
       });
-    });
-    return true; // Keep the message channel open for async response
+  }
+
+  if (message.type === "requestSheetNames") {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          chrome.tabs.sendMessage(tabs[0].id, { type: "getSheetNames" }, (response) => {
+              sendResponse(response);
+          });
+      });
+      return true; // Keep the channel open for async response
+  }
+
+  if (message.action === "getCurrentCellIndex") {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          chrome.tabs.sendMessage(tabs[0].id, { action: "getCurrentCellIndex" }, (response) => {
+              sendResponse(response);
+          });
+      });
+      return true; // Keep the channel open for async response
   }
 });
+

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,6 +8,7 @@
   <link href="styles/tailwind.min.css" rel="stylesheet">
   <script src="scripts/sidepanel.js" defer></script>
 </head>
+
 <body class="bg-gray-100 text-gray-900 p-4">
   <div>
     <div class="flex items-center justify-between mb-4">
@@ -14,8 +16,19 @@
       <button id="clearCellIndex" class="bg-red-500 text-white px-2 py-1 rounded-full">Clear</button>
     </div>
     <div>
-      <p>Current Cell: <span id="currentCell"></span></p>
+      <p class="text-lg font-bold my-2">Current Cell: <span id="currentCell"></span></p>
+    </div>
+  </div>
+
+  <div class="flex flex-col space-y-4">
+    <!-- Dropdown for Sheet Tabs -->
+    <div class="flex items-center space-x-2">
+      <label for="sheetTabs" class="text-sm font-medium">Sheet Tabs:</label>
+      <select id="sheetTabs" class="border border-gray-300 px-2 py-1 rounded flex-1">
+        <option value="" disabled selected>Select a sheet</option>
+      </select>
     </div>
   </div>
 </body>
+
 </html>
