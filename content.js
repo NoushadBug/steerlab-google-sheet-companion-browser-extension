@@ -139,6 +139,74 @@ async function simulateValueSet(value) {
     }
 }
 
+// it will trigger key events for the given key (enter or escape)
+async function triggerKeyEvents(key, holdTime = 0) {
+    let keyCode;
+    switch (key) {
+        case "Escape":
+            keyCode = 27;  // Escape key
+            break;
+        case "Enter":
+            keyCode = 13;  // Enter key
+            break;
+        default:
+            keyCode = key.charCodeAt(0); // For regular characters
+            break;
+    }
+
+    const keyDownEvent = new KeyboardEvent("keydown", {
+        key: key,
+        code: key,
+        keyCode: keyCode,
+        bubbles: true,
+        cancelable: true,
+    });
+
+    const keyPressEvent = new KeyboardEvent("keypress", {
+        key: key,
+        code: key,
+        keyCode: keyCode,
+        bubbles: true,
+        cancelable: true,
+    });
+
+    const keyUpEvent = new KeyboardEvent("keyup", {
+        key: key,
+        code: key,
+        keyCode: keyCode,
+        bubbles: true,
+        cancelable: true,
+    });
+
+    // Ensure focus is on the active element
+    const activeElement = document.activeElement;
+    if (activeElement) {
+        activeElement.dispatchEvent(keyDownEvent);  // Key press starts
+        activeElement.dispatchEvent(keyPressEvent); // Simulate press
+        if (holdTime > 0) await delay(holdTime);    // Hold key if needed
+        activeElement.dispatchEvent(keyUpEvent);    // Release key
+    }
+}
+
+function getDropdownListOptions(className) {
+    const elements = document.querySelectorAll(className);
+    return Array.from(elements).map(element => element.textContent.trim());
+}
+
+
+async function getDropdownListByRange(range) {
+    // Set the current cell index (e.g., "E2")
+    await setCurrentCellIndex(range);
+    await triggerKeyEvents("Enter", 100); // Press and hold Enter for 100ms
+    const ddList = getDropdownListOptions('.waffle-dropdown-chip'); // Get dropdown list options
+    console.log(ddList); // Print the contents to the console
+    await triggerKeyEvents("Escape", 100); // Trigger the Escape key after getting the list
+    return ddList; // Return the array
+}
+
+
+
+// sheet name clicker
 function clickTabByName(tabName) {
     const tabNames = document.querySelectorAll('.docs-sheet-tab .docs-sheet-tab-name');
 
@@ -231,4 +299,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         const cellIndex = getCurrentCellIndex();
         sendResponse({ cellIndex });
     }
+
+    if (message.action === "getDropdownListByRange") {
+        getDropdownListByRange(message.range).then(ddList => {
+            console.log(ddList); // Log the resolved dropdown list
+            sendResponse(ddList); // Send the resolved array as the response
+        });
+        return true; // Indicate that the response will be sent asynchronously
+    }
+
 });
