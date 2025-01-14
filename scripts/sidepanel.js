@@ -1,86 +1,78 @@
 document.addEventListener("DOMContentLoaded", () => {
-  const dropdown = document.getElementById("sheetTabs");
   const currentCellElement = document.getElementById("currentCell");
-  const clearButton = document.getElementById("clearCellIndex");
+  const saveButton = document.getElementById("saveButton");
+  let quill;
+  let previousCellIndex = null; // Track the previous cell index
 
-  // Function to send a message to content.js to get the dropdown list
-  async function fetchDropdownList(range) {
-    console.log(range);
+  // Initialize Quill Editor
+  function initializeQuill() {
+    quill = new Quill("#quillEditor", {
+      theme: "snow",
+      modules: {
+        toolbar: [
+          [{ font: [] }, { size: [] }],
+          ["bold", "italic", "underline", "strike"],
+          [{ color: [] }, { background: [] }],
+          [{ script: "super" }, { script: "sub" }],
+          [{ header: "1" }, { header: "2" }, "blockquote", "code-block"],
+          [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
+          ["direction", { align: [] }],
+          ["link", "image", "video", "formula"],
+          ["clean"],
+        ],
+      },
+      placeholder: "Edit cell content here...",
+    });
+  }
 
+  // Fetch current cell index
+  function fetchCellIndex() {
+    chrome.runtime.sendMessage({ action: "getCurrentCellIndex" }, (response) => {
+      if (response) {
+        const currentCellIndex = response.cellIndex || "N/A";
+
+        // Check if the cell index has changed
+        if (currentCellIndex !== previousCellIndex) {
+          previousCellIndex = currentCellIndex; // Update the tracked cell index
+          fetchCellContent(); // Fetch content only if the cell index has changed
+        }
+      }
+    });
+  }
+
+  // Fetch current cell content from the backend
+  function fetchCellContent() {
+    chrome.runtime.sendMessage({ action: "getCurrentCellValue" }, (response) => {
+      console.log("Fetched cell content:", response);
+      if (response && response.cellValue !== undefined) {
+        quill.root.innerHTML = response.cellValue || "";
+      } else {
+        console.error("Failed to fetch cell value:", response);
+      }
+    });
+  }
+
+  // Save Quill content back to the cell
+  function saveCellContent() {
+    const content = quill.root.innerHTML;
     chrome.runtime.sendMessage(
-      { type: "getDropdownListByRange", range: range },
-      function (response) {
-        console.log(JSON.stringify(response));
-        // When the response is received, update the dropdown list in the sidebar
-        updateDropdownList(response);
+      { action: "setCellValue", cellValue: content },
+      (response) => {
+        if (response && response.success) {
+          console.log("Cell content saved successfully!");
+        } else {
+          console.error("Failed to save cell value:", response);
+        }
       }
     );
   }
 
-  // Function to update the dropdown list in the sidebar
-  function updateDropdownList(ddList) {
-    const dropdownListElement = document.getElementById('dropdownList');
-    dropdownListElement.innerHTML = ''; // Clear the list before adding new items
-    ddList.forEach(item => {
-      const listItem = document.createElement('li');
-      listItem.textContent = item;
-      dropdownListElement.appendChild(listItem);
-    });
-  }
+  // Initialize Quill editor on load
+  initializeQuill();
 
-  // Event listener for the "Get Dropdown List" button
-  document.getElementById('getDropdownListButton').addEventListener('click', function () {
-    const range = document.getElementById('currentCell').textContent; // Get current cell or default to 'A1'
-    fetchDropdownList(range);
-  });
+  // Save content on button click
+  saveButton.addEventListener("click", saveCellContent);
 
-  // Request sheet names
-  chrome.runtime.sendMessage({ type: "requestSheetNames" }, (response) => {
-    console.log(response);
-    if (response && response.sheetNames) {
-      populateDropdown(response.sheetNames);
-    } else {
-      console.error("No sheet names received");
-    }
-  });
-
-  function populateDropdown(sheetNames) {
-    dropdown.innerHTML = ""; // Clear previous options
-
-    const defaultOption = document.createElement("option");
-    defaultOption.textContent = "Select a sheet";
-    defaultOption.value = "";
-    defaultOption.disabled = true;
-    defaultOption.selected = true;
-    dropdown.appendChild(defaultOption);
-
-    sheetNames.forEach((sheetName) => {
-      const option = document.createElement("option");
-      option.value = sheetName;
-      option.textContent = sheetName;
-      dropdown.appendChild(option);
-    });
-  }
-
-  dropdown.addEventListener("change", (event) => {
-    const selectedSheet = event.target.value;
-    chrome.runtime.sendMessage({
-      type: "sheetSelected",
-      sheetName: selectedSheet,
-    });
-  });
-
-  function fetchCellIndex() {
-    chrome.runtime.sendMessage({ action: "getCurrentCellIndex" }, (response) => {
-      if (response) {
-        currentCellElement.textContent = response.cellIndex || "N/A";
-      }
-    });
-  }
-
-  clearButton.addEventListener("click", () => {
-    currentCellElement.textContent = "";
-  });
-
+  // Periodically check for cell index changes
   setInterval(fetchCellIndex, 1000);
 });

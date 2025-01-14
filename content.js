@@ -79,7 +79,7 @@ async function getValueFromCell(cellIndex, goPreviousCell = true) {
 }
 
 async function setCellValue(cellIndex, value, preservePrevCellIndex = true) {
-    await setCurrentCellIndex(cellIndex);
+    if(cellIndex) await setCurrentCellIndex(cellIndex);
 
     await simulateValueSet(value);
     await simulateValueSet(value);
@@ -298,6 +298,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === "getCurrentCellIndex") {
         const cellIndex = getCurrentCellIndex();
         sendResponse({ cellIndex });
+    }
+
+    if (message.action === "getCurrentCellValue") {
+        const cellValue = getCurrentCellValue();
+        sendResponse({ cellValue });
+    }
+
+    if (message.action === "setCellValue") {
+        setCellValue(null, message.cellValue);
+        sendResponse({ success: true });
     }
 
     if (message.action === "getDropdownListByRange") {

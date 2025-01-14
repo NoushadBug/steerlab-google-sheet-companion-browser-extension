@@ -52,6 +52,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Keep the channel open for async response
   }
 
+  if (message.action === "getCurrentCellValue") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "getCurrentCellValue" }, (response) => {
+        sendResponse(response);
+      });
+    });
+    return true; // Keep the channel open for async response
+  }
+
+  if (message.action === "setCellValue") {
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      chrome.tabs.sendMessage(tabs[0].id, { action: "setCellValue", cellValue: message.cellValue }, (response) => {
+        sendResponse(response);
+      });
+    });
+    return true; // Keep the channel open for async response
+  }
+
   if (message.type === "getDropdownListByRange") {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       chrome.tabs.sendMessage(tabs[0].id, { action: "getDropdownListByRange", range: message.range }, (response) => {

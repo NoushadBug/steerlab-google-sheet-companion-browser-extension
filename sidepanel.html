@@ -4,48 +4,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Google Sheets Sidebar</title>
-  <link href="styles/tailwind.min.css" rel="stylesheet">
-  <script src="scripts/sidepanel.js" defer></script>
+  <title>Google Sheets Cell Editor</title>
+  <!-- Tailwind CSS -->
+  <link href="./styles/tailwind.min.css" rel="stylesheet">
+  <!-- Quill Editor -->
+  <link href="./styles/quill.snow.css" rel="stylesheet">
+  <script src="./scripts/quill.min.js"></script>
+  <script src="./scripts/sidepanel.js" defer></script>
 </head>
 
 <body class="bg-gray-100 text-gray-900 p-4">
-  <div>
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-lg font-semibold">Sidebar for Google Sheets</h1>
-      <button id="clearCellIndex" class="bg-red-500 text-white px-2 py-1 rounded-full">Clear</button>
-    </div>
-    <div class="my-2">
-      <p class="text-lg font-bold">Current Cell: <span id="currentCell"></span></p>
-      <small class="text-xsm text-green-600">Click on any cell in the sheet to get real time cell index.</small>
-    </div>
+  <div class="mb-4">
+    <h1 class="text-xl font-semibold text-center">Google Sheets Cell Editor</h1>
   </div>
 
-  <div class="flex flex-col space-y-4">
-    <!-- Dropdown for Sheet Tabs -->
-    <div class="flex items-center space-x-2">
-      <label for="sheetTabs" class="text-sm font-medium">Sheet Tabs:</label>
-      <select id="sheetTabs" class="border border-gray-300 px-2 py-1 rounded flex-1">
-        <option value="" disabled selected>Select a sheet</option>
-      </select>
-    </div>
+  <!-- Quill Editor Container -->
+  <div id="editorContainer" class="bg-white border border-gray-300 rounded p-2">
+    <div id="quillEditor" style="height: 350px;"></div>
   </div>
-  <br>
 
-  <!-- Button to Trigger Dropdown List Fetch -->
-  <div class="flex justify-between items-center">
-    <button id="getDropdownListButton" class="bg-blue-500 text-white px-4 py-2 rounded-full">
-      Get Dropdown List
+  <!-- Current Cell Information -->
+  <div class="my-4">
+    <small class="text-sm text-green-600">Click on any cell in the sheet to update the editor.</small>
+  </div>
+
+  <!-- Buttons -->
+  <div class="flex justify-between">
+    <button id="saveButton" class="w-full bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+      Save
     </button>
   </div>
 
-  <!-- List of Dropdown Options -->
-  <div>
-    <h3 class="font-semibold">Dropdown List:</h3>
-    <ul id="dropdownList" class="list-disc pl-6">
-      <!-- List items will be dynamically added here -->
-    </ul>
-  </div>
+  <!-- Footer -->
+  <footer class="mt-8 text-center text-gray-600 text-sm">
+    <p>
+      Developed by <span class="font-semibold">Noushad</span>. Visit my
+      <a href="https://www.fiverr.com/web_coder_nsd" target="_blank" class="text-blue-500 hover:underline">
+        Fiverr Profile
+      </a>.
+    </p>
+  </footer>
 </body>
 
 </html>
