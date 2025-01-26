@@ -1,11 +1,13 @@
+// Wait for the JSONEditor script to load
 document.addEventListener("DOMContentLoaded", () => {
-  const currentCellElement = document.getElementById("currentCell");
   const saveButton = document.getElementById("saveButton");
   let quill;
+  let jsonEditor;
   let previousCellIndex = null; // Track the previous cell index
 
   // Initialize Quill Editor
   function initializeQuill() {
+    const quillContainer = document.getElementById("quillEditor");
     quill = new Quill("#quillEditor", {
       theme: "snow",
       modules: {
@@ -25,8 +27,29 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Fetch current cell index
-  function fetchCellIndex() {
+  // Initialize JSON Editor
+  function initializeJsonEditor() {
+    const jsonContainer = document.getElementById("jsonEditorContainer");
+    const options = {
+      mode: "tree",
+    };
+    jsonEditor = new JSONEditor(jsonContainer, options);
+  }
+
+  // Clean editors
+  function cleanEditors() {
+    if (quill) {
+      quill = null;
+      document.querySelectorAll(".ql-toolbar").forEach((el) => el.remove());
+    }
+    if (jsonEditor) {
+      jsonEditor.destroy();
+      jsonEditor = null;
+    }
+  }
+
+  // Fetch current cell content from the backend
+  function fetchCellContent() {
     chrome.runtime.sendMessage({ action: "getCurrentCellIndex" }, (response) => {
       if (response) {
         const currentCellIndex = response.cellIndex || "N/A";
@@ -34,29 +57,59 @@ document.addEventListener("DOMContentLoaded", () => {
         // Check if the cell index has changed
         if (currentCellIndex !== previousCellIndex) {
           previousCellIndex = currentCellIndex; // Update the tracked cell index
-          fetchCellContent(); // Fetch content only if the cell index has changed
+
+          chrome.runtime.sendMessage({ action: "getCurrentCellValue" }, (cellResponse) => {
+            if (cellResponse && cellResponse.cellValue !== undefined) {
+              try {
+                const parsedJson = JSON.parse(cellResponse.cellValue);
+                activateJsonEditor(parsedJson);
+              } catch (e) {
+                activateQuill(cellResponse.cellValue);
+              }
+            } else {
+              console.error("Failed to fetch cell value:", cellResponse);
+            }
+          });
         }
       }
     });
   }
 
-  // Fetch current cell content from the backend
-  function fetchCellContent() {
-    chrome.runtime.sendMessage({ action: "getCurrentCellValue" }, (response) => {
-      console.log("Fetched cell content:", response);
-      if (response && response.cellValue !== undefined) {
-        quill.root.innerHTML = response.cellValue || "";
-      } else {
-        console.error("Failed to fetch cell value:", response);
-      }
-    });
+  // Activate Quill Editor
+  function activateQuill(content) {
+    cleanEditors();
+    initializeQuill();
+    quill.root.innerHTML = content || "";
+    document.getElementById("quillEditor").style.display = "block";
+    document.getElementById("jsonEditorContainer").style.display = "none";
   }
 
-  // Save Quill content back to the cell
+  // Activate JSON Editor
+  function activateJsonEditor(jsonContent) {
+    cleanEditors();
+    initializeJsonEditor();
+    jsonEditor.set(jsonContent);
+    document.getElementById("quillEditor").style.display = "none";
+    document.getElementById("jsonEditorContainer").style.display = "block";
+  }
+
+  // Save cell content back to the cell
   function saveCellContent() {
-    const content = quill.root.innerHTML;
+    let content;
+    if (jsonEditor) {
+      content = JSON.stringify(jsonEditor.get(), null, 2);
+    } else if (quill) {
+      content = quill.root.innerHTML;
+    }
+    content = content.replace(/(\r\n|\n|\r)/gm, "");
+    try {
+      content = JSON.stringify(JSON.parse(content));
+    } catch (e) {
+      // Do nothing
+    }
     chrome.runtime.sendMessage(
-      { action: "setCellValue", cellValue: content },
+
+      { action: "setCellValue", cellValue: content.replace(/(\r\n|\n|\r)/gm, "") },
       (response) => {
         if (response && response.success) {
           console.log("Cell content saved successfully!");
@@ -67,12 +120,9 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  // Initialize Quill editor on load
-  initializeQuill();
-
   // Save content on button click
   saveButton.addEventListener("click", saveCellContent);
 
-  // Periodically check for cell index changes
-  setInterval(fetchCellIndex, 1000);
+  // Periodically check for cell content changes
+  setInterval(fetchCellContent, 1000);
 });
