@@ -1,0 +1,9 @@
+ONE TRUST _ STEERLAB CODES
+
+1. EXPAND A QUESTION SECTION : document.querySelectorAll('.aa-section-list__section button')[1].click() // some of the questions which does not have any questions
+
+2. GET A QUESTION SECTION QUESTION LIST : document.querySelectorAll('.aa-question__name')
+
+3. GET INPUT PARTS OF A QUESTION : document.querySelectorAll('.aa-question__name')[the question index].closest('.aa-question__container').querySelectorAll('.aa-question__button-row, [ot-rich-text-editor-element] .ql-editor, .aa-question__multichoice, .vt-input-element')
+
+4. 
