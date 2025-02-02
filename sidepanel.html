@@ -2,50 +2,77 @@
 <html lang="en">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Google Sheets Sidebar</title>
-  <link href="styles/tailwind.min.css" rel="stylesheet">
-  <script src="scripts/sidepanel.js" defer></script>
+  <meta charset="UTF-8" />
+  <title>One Trust Companion</title>
+  <!-- Tailwind (or your own styles) -->
+  <link rel="stylesheet" href="styles/tailwind.min.css" />
+  <style>
+    /* Minimal local styling for collapsible sections */
+    .section-header {
+      cursor: pointer;
+      margin: 0.5rem 0;
+      padding: 0.5rem;
+      background-color: #f2f2f2;
+      border-radius: 4px;
+    }
+
+    .section-content {
+      padding-left: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .question-item {
+      margin: 0.5rem 0;
+      border: 1px solid #ddd;
+      padding: 0.5rem;
+      border-radius: 4px;
+    }
+
+    /* Modal backdrop & container */
+    #jsonModal {
+      display: none;
+      /* hidden by default */
+    }
+  </style>
 </head>
 
-<body class="bg-gray-100 text-gray-900 p-4">
-  <div>
-    <div class="flex items-center justify-between mb-4">
-      <h1 class="text-lg font-semibold">Sidebar for Google Sheets</h1>
-      <button id="clearCellIndex" class="bg-red-500 text-white px-2 py-1 rounded-full">Clear</button>
-    </div>
-    <div class="my-2">
-      <p class="text-lg font-bold">Current Cell: <span id="currentCell"></span></p>
-      <small class="text-xsm text-green-600">Click on any cell in the sheet to get real time cell index.</small>
-    </div>
-  </div>
+<body class="p-2">
+  <h1 class="text-xl font-bold mb-4">One Trust Companion</h1>
 
-  <div class="flex flex-col space-y-4">
-    <!-- Dropdown for Sheet Tabs -->
-    <div class="flex items-center space-x-2">
-      <label for="sheetTabs" class="text-sm font-medium">Sheet Tabs:</label>
-      <select id="sheetTabs" class="border border-gray-300 px-2 py-1 rounded flex-1">
-        <option value="" disabled selected>Select a sheet</option>
-      </select>
-    </div>
-  </div>
-  <br>
-
-  <!-- Button to Trigger Dropdown List Fetch -->
-  <div class="flex justify-between items-center">
-    <button id="getDropdownListButton" class="bg-blue-500 text-white px-4 py-2 rounded-full">
-      Get Dropdown List
+  <div class="mb-4 space-x-2">
+    <button id="btnScrape" class="bg-blue-600 text-white px-2 py-1 rounded">
+      Scrape All Sections
+    </button>
+    <button id="btnExpandAll" class="bg-gray-600 text-white px-3 py-1 rounded">
+      Expand/Collapse All
+    </button>
+    <button id="btnShowJSON" class="bg-purple-600 text-white px-3 py-1 rounded">
+      See the JSON
     </button>
   </div>
 
-  <!-- List of Dropdown Options -->
-  <div>
-    <h3 class="font-semibold">Dropdown List:</h3>
-    <ul id="dropdownList" class="list-disc pl-6">
-      <!-- List items will be dynamically added here -->
-    </ul>
+  <!-- Where the hierarchical data will be rendered -->
+  <div id="sectionsContainer"></div>
+
+  <!-- JSON Modal (hidden by default) -->
+  <div id="jsonModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+    <div class="bg-white p-4 rounded shadow-lg w-3/4 max-w-2xl">
+      <h2 class="text-lg font-bold mb-2">Sections Data</h2>
+      <small class="text-gray-500">You need to scrape all sections first</small>
+      <pre id="jsonOutput" class="overflow-auto max-h-96 p-2 border bg-gray-50 text-sm"></pre>
+      <div class="flex justify-end gap-2 mt-2">
+        <button id="btnCopyJson" class="bg-blue-500 text-white px-3 py-1 rounded">
+          Copy JSON
+        </button>
+        <button id="btnCloseModal" class="bg-red-500 text-white px-3 py-1 rounded">
+          Close
+        </button>
+      </div>
+    </div>
   </div>
+
+  <!-- JS for the side panel -->
+  <script src="scripts/sidepanel.js"></script>
 </body>
 
 </html>

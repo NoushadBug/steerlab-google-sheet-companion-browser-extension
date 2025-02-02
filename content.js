@@ -1,311 +1,205 @@
+// content.js
 
-/*
-/**
- * Get the value of the currently selected cell in Google Sheets.
- * @returns {string} The value of the current cell.
- */
-function getCurrentCellValue() {
-    var cellValue = document.querySelector('.cell-input').innerText;
-    return cellValue.trim();
-}
-
-/**
- * Get the index of the currently selected cell in Google Sheets.
- * @returns {string} The index of the current cell (e.g., "A1", "B2").
- */
-function getCurrentCellIndex() {
-    var cellIndex = document.querySelector(".waffle-name-box").value;
-    return cellIndex;
-}
-
-/**
- * Set the index of the selected cell in Google Sheets.
- * @param {string|object} cellIndex - The index of the cell to set (e.g., "A1", "B2") or a JSON object { column, row }.
- */
-async function setCurrentCellIndex(cellIndex) {
-    var inputBox = document.querySelector(".waffle-name-box");
-
-    if (typeof cellIndex === "string") {
-        inputBox.value = cellIndex;
-    } else if (typeof cellIndex === "object") {
-        var column = cellIndex.column || "";
-        var row = cellIndex.row || "";
-        inputBox.value = column + row;
-    }
-
-    // Trigger click event
-    var clickEvent = new MouseEvent("click", {
-        view: window,
-        bubbles: true,
-        cancelable: true,
-    });
-    inputBox.dispatchEvent(clickEvent);
-
-    await delay(80); // Delay for smoother execution
-
-    // Trigger enter key event
-    var enterEvent = new KeyboardEvent("keydown", {
-        key: "Enter",
-        code: "Enter",
-        keyCode: 13,
-        view: window,
-        bubbles: true,
-        cancelable: true,
-    });
-    inputBox.dispatchEvent(enterEvent);
-}
-
-/**
- * Get the value from a specified cell in Google Sheets and restore the previously selected cell.
- * @param {string|object} cellIndex - The index of the cell to retrieve the value from (e.g., "A1", "B2") or a JSON object { column, row }.
- * @returns {string} The value of the specified cell.
- */
-async function getValueFromCell(cellIndex, goPreviousCell = true) {
-    if (goPreviousCell) {
-        var previousCellIndex = getCurrentCellIndex();
-    }
-
-    if (typeof cellIndex === "string") {
-        await setCurrentCellIndex(cellIndex);
-    } else if (typeof cellIndex === "object") {
-        await setCurrentCellIndex(cellIndex.column + cellIndex.row);
-    }
-
-    var cellValue = getCurrentCellValue();
-    if (goPreviousCell) {
-        await setCurrentCellIndex(previousCellIndex);
-    }
-    return cellValue;
-}
-
-async function setCellValue(cellIndex, value, preservePrevCellIndex = true) {
-    await setCurrentCellIndex(cellIndex);
-
-    await simulateValueSet(value);
-    await simulateValueSet(value);
-
-    if (preservePrevCellIndex) {
-        await setCurrentCellIndex(cellIndex);
-    }
-}
-
-async function simulateValueSet(value) {
-    var inputBox = document.querySelector('.cell-input');
-
-    if (inputBox) {
-        // Trigger click event
-        nonReactive = true;
-        var clickEvent = new MouseEvent('click', {
-            view: window,
-            bubbles: true,
-            cancelable: true,
-        });
-        inputBox.dispatchEvent(clickEvent);
-        nonReactive = false;
-
-        await delay(80); // Delay for smoother execution
-
-        // Trigger keydown event
-        var keydownEvent = new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            view: window,
-            bubbles: true,
-            cancelable: true,
-        });
-        inputBox.dispatchEvent(keydownEvent);
-
-        // Set the cell value
-        inputBox.innerText = value;
-
-        // Trigger input event
-        var inputEvent = new Event('input', {
-            bubbles: true,
-            cancelable: true,
-        });
-        inputBox.dispatchEvent(inputEvent);
-
-        // Trigger keydown event
-        var keydownPress = new KeyboardEvent('keypress', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            view: window,
-            bubbles: true,
-            cancelable: true,
-        });
-        inputBox.dispatchEvent(keydownPress);
-    }
-}
-
-// it will trigger key events for the given key (enter or escape)
-async function triggerKeyEvents(key, holdTime = 0) {
-    let keyCode;
-    switch (key) {
-        case "Escape":
-            keyCode = 27;  // Escape key
-            break;
-        case "Enter":
-            keyCode = 13;  // Enter key
-            break;
-        default:
-            keyCode = key.charCodeAt(0); // For regular characters
-            break;
-    }
-
-    const keyDownEvent = new KeyboardEvent("keydown", {
-        key: key,
-        code: key,
-        keyCode: keyCode,
-        bubbles: true,
-        cancelable: true,
-    });
-
-    const keyPressEvent = new KeyboardEvent("keypress", {
-        key: key,
-        code: key,
-        keyCode: keyCode,
-        bubbles: true,
-        cancelable: true,
-    });
-
-    const keyUpEvent = new KeyboardEvent("keyup", {
-        key: key,
-        code: key,
-        keyCode: keyCode,
-        bubbles: true,
-        cancelable: true,
-    });
-
-    // Ensure focus is on the active element
-    const activeElement = document.activeElement;
-    if (activeElement) {
-        activeElement.dispatchEvent(keyDownEvent);  // Key press starts
-        activeElement.dispatchEvent(keyPressEvent); // Simulate press
-        if (holdTime > 0) await delay(holdTime);    // Hold key if needed
-        activeElement.dispatchEvent(keyUpEvent);    // Release key
-    }
-}
-
-function getDropdownListOptions(className) {
-    const elements = document.querySelectorAll(className);
-    return Array.from(elements).map(element => element.textContent.trim());
-}
-
-
-async function getDropdownListByRange(range) {
-    // Set the current cell index (e.g., "E2")
-    await setCurrentCellIndex(range);
-    await triggerKeyEvents("Enter", 100); // Press and hold Enter for 100ms
-    const ddList = getDropdownListOptions('.waffle-dropdown-chip'); // Get dropdown list options
-    console.log(ddList); // Print the contents to the console
-    await triggerKeyEvents("Escape", 100); // Trigger the Escape key after getting the list
-    return ddList; // Return the array
-}
-
-
-
-// sheet name clicker
-function clickTabByName(tabName) {
-    const tabNames = document.querySelectorAll('.docs-sheet-tab .docs-sheet-tab-name');
-
-    for (let i = 0; i < tabNames.length; i++) {
-        const nameElement = tabNames[i];
-
-        // Check if the name matches
-        if (nameElement.textContent.trim() === tabName.trim()) {
-            const parentTab = nameElement.closest('.docs-sheet-tab'); // Find the parent .docs-sheet-tab
-
-            if (parentTab) {
-                // Simulate mouse move
-                const mouseMoveEvent = new MouseEvent('mousemove', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                parentTab.dispatchEvent(mouseMoveEvent);
-
-                // Simulate mouse over
-                const mouseOverEvent = new MouseEvent('mouseover', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                parentTab.dispatchEvent(mouseOverEvent);
-
-                // Simulate mousedown
-                const mouseDownEvent = new MouseEvent('mousedown', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                parentTab.dispatchEvent(mouseDownEvent);
-
-                // Simulate mouseup
-                const mouseUpEvent = new MouseEvent('mouseup', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                parentTab.dispatchEvent(mouseUpEvent);
-
-                // Simulate click
-                const clickEvent = new MouseEvent('click', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                parentTab.dispatchEvent(clickEvent);
-
-                // Simulate mouseout
-                const mouseOutEvent = new MouseEvent('mouseout', {
-                    bubbles: true,
-                    cancelable: true,
-                    view: window
-                });
-                parentTab.dispatchEvent(mouseOutEvent);
-
-                console.log(`Clicked tab: ${tabName}`);
-                return; // Exit the function after clicking the desired tab
-            }
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const { action, data } = request;
+  
+    if (action === 'SCRAPE_SECTIONS') {
+      // Make it async to wait for scrapeSections() (which is async)
+      (async () => {
+        try {
+          const sections = await scrapeSections();
+          // sections should be an array
+          sendResponse(sections);
+        } catch (err) {
+          console.error('[content.js] Error scraping sections:', err);
+          // Return an empty array or an error message
+          sendResponse([]);
         }
+      })();
+      // Return true to indicate we'll send an asynchronous response
+      return true;
     }
-
-    console.error(`Tab with name "${tabName}" not found!`);
-}
-
-
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-// You can use this for further DOM manipulation or custom behavior
-console.log("Google Sheets Sidebar Extension Loaded");
-
-
-// Listener for incoming messages
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "sheetSelected") {
-        clickTabByName(message.sheetName);
+  
+    if (action === 'GRAB_ANSWER') {
+      // data is the question object
+      const answer = grabAnswerFromDom(data);
+      sendResponse({ answer });
+      return true;
     }
-
-    if (message.type === "getSheetNames") {
-        const tabs = Array.from(document.querySelectorAll('.docs-sheet-tab .docs-sheet-tab-name'))
-            .map(tab => tab.textContent);
-        sendResponse({ sheetNames: tabs });
+  
+    if (action === 'PUSH_ANSWER') {
+      // data is the question object with .userAnswer
+      pushAnswerToDom(data);
+      sendResponse({ success: true });
+      return true;
     }
-
-    if (message.action === "getCurrentCellIndex") {
-        const cellIndex = getCurrentCellIndex();
-        sendResponse({ cellIndex });
-    }
-
-    if (message.action === "getDropdownListByRange") {
-        getDropdownListByRange(message.range).then(ddList => {
-            console.log(ddList); // Log the resolved dropdown list
-            sendResponse(ddList); // Send the resolved array as the response
+  });
+  
+  
+  /**
+   * Helper: Wait until .questions-container ot-loading elements are gone.
+   * Polls every 500ms. Exits once the elements are gone or times out.
+   */
+  function waitUntilLoaded(timeoutMs = 20000) {
+    return new Promise((resolve, reject) => {
+      let elapsed = 0;
+      const interval = 500;
+  
+      const check = () => {
+        const loadingEls = document.querySelectorAll('.questions-container ot-loading');
+        if (loadingEls.length === 0) {
+          // No more loading spinners => resolve
+          clearInterval(timerId);
+          resolve();
+        } else {
+          // Still loading, check if we timed out
+          elapsed += interval;
+          if (elapsed >= timeoutMs) {
+            clearInterval(timerId);
+            reject(new Error('Timed out waiting for questions to load.'));
+          }
+        }
+      };
+  
+      const timerId = setInterval(check, interval);
+      check(); // immediate check
+    });
+  }
+  
+  /**
+   * Scrapes all sections from the OneTrust UI by:
+   * 1) Clicking each section button
+   * 2) Waiting for .questions-container ot-loading to disappear
+   * 3) Collecting .aa-question__name data
+   * Returns an array of sections, each with a questions array.
+   */
+  async function scrapeSections() {
+    const allSections = [];
+  
+    // Step 1: get all the section elements
+    const sectionEls = document.querySelectorAll('.aa-section-list__section');
+  
+    for (let secIndex = 0; secIndex < sectionEls.length; secIndex++) {
+      const secEl = sectionEls[secIndex];
+      const secButton = secEl.querySelector('button');
+      const secName = secButton ? secButton.textContent.trim() : `Section ${secIndex + 1}`;
+  
+      // Expand this section if there's a button
+      if (secButton) {
+        secButton.click();
+        // Wait until questions are fully loaded
+        try {
+          await waitUntilLoaded();
+        } catch (err) {
+          console.warn('[content.js] Loading timed out or failed:', err);
+          // You can decide to continue or break here
+        }
+      }
+  
+      // Now scrape whatever questions are in this section
+      const questionNameEls = document.querySelectorAll('.aa-question__name');
+      const questionsArr = [];
+  
+      questionNameEls.forEach((qEl, qIndex) => {
+        const txt = qEl.textContent.trim();
+        const container = qEl.closest('.aa-question__container');
+        const questionId = `Q${secIndex + 1}.${qIndex + 1}`;
+  
+        // Possibly detect answer type from container
+        const answerType = detectAnswerType(container);
+  
+        questionsArr.push({
+          sectionId: `${secIndex + 1}`,
+          questionId,
+          questionText: txt,
+          answerType
         });
-        return true; // Indicate that the response will be sent asynchronously
+      });
+  
+      allSections.push({
+        sectionName: secName,
+        sectionId: `${secIndex + 1}`,
+        questions: questionsArr
+      });
     }
-
-});
+  
+    return allSections;
+  }
+  
+  /**
+   * Classify the question type by looking for known selectors.
+   */
+  function detectAnswerType(containerEl) {
+    if (!containerEl) return '';
+    if (containerEl.querySelector('.vt-input-element')) {
+      return 'text_bar';
+    } else if (containerEl.querySelector('.aa-question__multichoice')) {
+      return 'multichoice';
+    } else if (containerEl.querySelector('[ot-rich-text-editor-element]')) {
+      return 'rich_text';
+    }
+    return 'unknown';
+  }
+  
+  /**
+   * Read the current text/checked values from the question in the DOM.
+   */
+  function grabAnswerFromDom(question) {
+    // We might locate by matching question.questionText or questionId
+    const questionEls = Array.from(document.querySelectorAll('.aa-question__name'));
+    const targetNameEl = questionEls.find(el => el.textContent.trim() === question.questionText);
+    if (!targetNameEl) return '';
+  
+    const container = targetNameEl.closest('.aa-question__container');
+    if (!container) return '';
+  
+    // Depending on type, read from different elements
+    if (question.answerType === 'text_bar') {
+      const inputEl = container.querySelector('.vt-input-element');
+      return inputEl ? inputEl.value : '';
+    } else if (question.answerType === 'rich_text') {
+      const ql = container.querySelector('[ot-rich-text-editor-element] .ql-editor');
+      return ql ? ql.innerHTML : '';
+    } else if (question.answerType === 'multichoice') {
+      const checkEls = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+      const checkedValues = checkEls.filter(c => c.checked).map(c => c.value);
+      return checkedValues.join(', ');
+    }
+  
+    return '';
+  }
+  
+  /**
+   * Fill the DOM’s input fields for this question with question.userAnswer.
+   */
+  function pushAnswerToDom(question) {
+    const questionEls = Array.from(document.querySelectorAll('.aa-question__name'));
+    const targetNameEl = questionEls.find(el => el.textContent.trim() === question.questionText);
+    if (!targetNameEl) return;
+  
+    const container = targetNameEl.closest('.aa-question__container');
+    if (!container) return;
+  
+    const answer = question.userAnswer || '';
+  
+    if (question.answerType === 'text_bar') {
+      const inputEl = container.querySelector('.vt-input-element');
+      if (inputEl) {
+        inputEl.value = answer;
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    } else if (question.answerType === 'rich_text') {
+      const ql = container.querySelector('[ot-rich-text-editor-element] .ql-editor');
+      if (ql) {
+        ql.innerHTML = answer;
+        ql.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    } else if (question.answerType === 'multichoice') {
+      const checkEls = Array.from(container.querySelectorAll('input[type="checkbox"]'));
+      checkEls.forEach((c) => {
+        c.checked = answer.includes(c.value);
+        c.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+  }
+  

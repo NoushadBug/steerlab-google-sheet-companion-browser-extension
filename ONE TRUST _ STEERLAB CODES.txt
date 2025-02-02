@@ -6,4 +6,6 @@ ONE TRUST _ STEERLAB CODES
 
 3. GET INPUT PARTS OF A QUESTION : document.querySelectorAll('.aa-question__name')[the question index].closest('.aa-question__container').querySelectorAll('.aa-question__button-row, [ot-rich-text-editor-element] .ql-editor, .aa-question__multichoice, .vt-input-element')
 
-4. 
+4. GO TO NEXT PAGE: document.querySelector('[ot-auto-id="AssessmentSectionDetailFooterNextButton"]').click()
+
+5. GO TO PREVIOUS BUTTON: document.querySelector('[ot-auto-id="AssessmentSectionDetailFooterPreviousButton"]').click()
