@@ -1,18 +1,17 @@
-let sectionsData = []; // [{ sectionName, sectionId, questions: [...] }, ...]
+let flatQuestions = [];
 
 document.addEventListener('DOMContentLoaded', () => {
   const btnScrape = document.getElementById('btnScrape');
-  const btnExpandAll = document.getElementById('btnExpandAll');
   const btnShowJSON = document.getElementById('btnShowJSON');
-  const sectionsContainer = document.getElementById('sectionsContainer');
+  const questionsContainer = document.getElementById('questionsContainer');
 
-  // The modal elements
+  // Modal elements
   const jsonModal = document.getElementById('jsonModal');
   const jsonOutput = document.getElementById('jsonOutput');
   const btnCloseModal = document.getElementById('btnCloseModal');
   const btnCopyJson = document.getElementById('btnCopyJson');
 
-  // On click, ask content script to scrape all sections
+  // Click: Scrape all sections
   btnScrape.addEventListener('click', () => {
     getActiveTabId().then((tabId) => {
       chrome.tabs.sendMessage(tabId, { action: 'SCRAPE_SECTIONS' }, (response) => {
@@ -22,156 +21,159 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         console.log('[sidepanel.js] SCRAPE_SECTIONS response:', response);
 
-        // Validate the response is an array
         if (!Array.isArray(response)) {
-          console.error('[sidepanel.js] SCRAPE_SECTIONS did not return an array. Received:', response);
+          console.error('[sidepanel.js] Did not receive an array of sections:', response);
           return;
         }
 
-        // Store it globally
-        sectionsData = response;
-        // Render them in collapsible sections
-        renderSections(sectionsData, sectionsContainer);
+        // Flatten the data
+        flatQuestions = [];
+        response.forEach((section, sIdx) => {
+          section.questions.forEach((q) => {
+            flatQuestions.push({
+              ...q,
+              sectionIndex: sIdx,             // for opening correct section
+              sectionName: section.sectionName,
+              userAnswer: ''                  // local text area
+            });
+          });
+        });
+
+        renderQuestions(flatQuestions, questionsContainer);
       });
     });
   });
 
-  // Toggle expand/collapse all
-  btnExpandAll.addEventListener('click', () => {
-    const allContents = sectionsContainer.querySelectorAll('.section-content');
-    allContents.forEach((sec) => {
-      sec.classList.toggle('hidden');
-    });
-  });
-
-  // Show the JSON in a modal popup
+  // Show JSON
   btnShowJSON.addEventListener('click', () => {
-    // Convert sectionsData to a pretty-printed JSON string
-    const jsonString = JSON.stringify(sectionsData, null, 2);
-    jsonOutput.textContent = jsonString;
-    // Display the modal
+    const jsonStr = JSON.stringify(flatQuestions, null, 2);
+    jsonOutput.textContent = jsonStr;
     jsonModal.style.display = 'flex';
   });
 
-  // Close the modal
+  // Close modal
   btnCloseModal.addEventListener('click', () => {
     jsonModal.style.display = 'none';
   });
 
-  // Copy the JSON from the <pre> to the clipboard
+  // Copy JSON
   btnCopyJson.addEventListener('click', () => {
-    // read directly from jsonOutput.textContent
-    const textToCopy = jsonOutput.textContent;
+    const textToCopy = jsonOutput.textContent || '';
     if (!textToCopy) return;
-
     navigator.clipboard.writeText(textToCopy)
-      .then(() => {
-        console.log('[sidepanel.js] JSON copied to clipboard!');
-        // Optionally show a small notification or toast
-      })
-      .catch(err => {
-        console.error('[sidepanel.js] Failed to copy JSON:', err);
-      });
+      .then(() => console.log('[sidepanel.js] JSON copied to clipboard!'))
+      .catch(err => console.error('[sidepanel.js] Copy failed:', err));
   });
 });
 
 /**
- * Renders the entire sections/questions list in a collapsible format.
+ * Renders the entire question list in a flat format. 
+ * Each question has:
+ * - A "Go to" button (or clickable text) to open/scroll in OneTrust
+ * - A textarea for the local userAnswer
+ * - "Grab from Page" / "Push to Page" buttons
  */
-function renderSections(sections, containerEl) {
-  containerEl.innerHTML = ''; // Clear old data
+function renderQuestions(questions, containerEl) {
+  containerEl.innerHTML = '';
 
-  sections.forEach((section) => {
-    // Create a wrapper for the section
-    const sectionWrapper = document.createElement('div');
-    sectionWrapper.classList.add('mb-2');
+  questions.forEach((q, i) => {
+    // Wrapper for each question
+    const wrapper = document.createElement('div');
+    wrapper.className = 'border rounded p-3 bg-gray-50';
 
-    // Create a clickable header for the section
-    const header = document.createElement('div');
-    header.className = 'section-header font-semibold';
-    header.textContent = section.sectionName + (section.sectionId ? ` (ID: ${section.sectionId})` : '');
+    // Title row with a "Go to" button
+    const titleRow = document.createElement('div');
+    titleRow.className = 'flex items-center justify-between mb-2';
 
-    // The content area is hidden by default
-    const content = document.createElement('div');
-    content.className = 'section-content hidden';
+    const titleText = document.createElement('div');
+    titleText.className = 'font-semibold';
+    titleText.textContent = `Q${q.questionDisplayNumber}: ${q.questionText}`;
 
-    header.addEventListener('click', () => {
-      content.classList.toggle('hidden');
+    // "Go To" button
+    const btnGoTo = document.createElement('button');
+    btnGoTo.className = 'bg-blue-400 text-white px-2 py-1 rounded';
+    btnGoTo.textContent = 'Go to';
+    btnGoTo.addEventListener('click', () => {
+      scrollToQuestion(q);
     });
 
-    // For each question, render a "card"
-    section.questions.forEach((q) => {
-      const qDiv = document.createElement('div');
-      qDiv.className = 'question-item border rounded p-2 mb-2';
+    titleRow.appendChild(titleText);
+    titleRow.appendChild(btnGoTo);
+    wrapper.appendChild(titleRow);
 
-      // Title
-      const qTitle = document.createElement('p');
-      qTitle.innerHTML = `<strong>${q.questionText}</strong> (SecID: ${q.sectionId}, QID: ${q.questionId})`;
-      qDiv.appendChild(qTitle);
+    // Show section name or questionId if you like
+    const meta = document.createElement('div');
+    meta.className = 'text-sm text-gray-500 mb-2';
+    meta.textContent = `Section: ${q.sectionName} | ID: ${q.questionId} | Type: ${q.answerType || 'N/A'}`;
+    wrapper.appendChild(meta);
 
-      // Show metadata (answer type, etc.) if present
-      if (q.answerType) {
-        const metaP = document.createElement('p');
-        metaP.textContent = `Answer Type: ${q.answerType}`;
-        metaP.classList.add('text-sm', 'text-gray-600', 'mb-1');
-        qDiv.appendChild(metaP);
-      }
-
-      // Textarea or input for the user's typed answer
-      const inputEl = document.createElement('textarea');
-      inputEl.classList.add('w-full', 'border', 'rounded', 'p-1', 'mb-2');
-      inputEl.setAttribute('rows', '2');
-      inputEl.value = q.userAnswer || '';
-      inputEl.addEventListener('input', (e) => {
-        // keep it in memory so we can push it later
-        q.userAnswer = e.target.value;
-      });
-      qDiv.appendChild(inputEl);
-
-      // Button row
-      const btnRow = document.createElement('div');
-      btnRow.classList.add('space-x-2');
-
-      // "Grab from Page"
-      const btnGrab = document.createElement('button');
-      btnGrab.textContent = 'Grab from Page';
-      btnGrab.className = 'bg-yellow-400 px-2 py-1 rounded';
-      btnGrab.addEventListener('click', () => {
-        grabQuestionAnswer(q).then((answerFromDom) => {
-          q.userAnswer = answerFromDom;
-          inputEl.value = answerFromDom;
-        });
-      });
-      btnRow.appendChild(btnGrab);
-
-      // "Push to Page"
-      const btnPush = document.createElement('button');
-      btnPush.textContent = 'Push to Page';
-      btnPush.className = 'bg-green-500 text-white px-2 py-1 rounded';
-      btnPush.addEventListener('click', () => {
-        pushQuestionAnswer(q);
-      });
-      btnRow.appendChild(btnPush);
-
-      qDiv.appendChild(btnRow);
-      content.appendChild(qDiv);
+    // Textarea for the user's typed answer
+    const inputEl = document.createElement('textarea');
+    inputEl.className = 'w-full border rounded p-1 mb-2';
+    inputEl.setAttribute('rows', '2');
+    inputEl.value = q.userAnswer || '';
+    inputEl.addEventListener('input', (e) => {
+      q.userAnswer = e.target.value;
     });
+    wrapper.appendChild(inputEl);
 
-    sectionWrapper.appendChild(header);
-    sectionWrapper.appendChild(content);
-    containerEl.appendChild(sectionWrapper);
+    // Button row: "Grab" / "Push"
+    const btnRow = document.createElement('div');
+    btnRow.className = 'flex space-x-2';
+
+    // Grab
+    const btnGrab = document.createElement('button');
+    btnGrab.textContent = 'Grab from Page';
+    btnGrab.className = 'bg-yellow-400 px-2 py-1 rounded';
+    btnGrab.addEventListener('click', () => {
+      grabQuestionAnswer(q).then(answer => {
+        q.userAnswer = answer;
+        inputEl.value = answer;
+      });
+    });
+    btnRow.appendChild(btnGrab);
+
+    // Push
+    const btnPush = document.createElement('button');
+    btnPush.textContent = 'Push to Page';
+    btnPush.className = 'bg-green-500 text-white px-2 py-1 rounded';
+    btnPush.addEventListener('click', () => {
+      pushQuestionAnswer(q);
+    });
+    btnRow.appendChild(btnPush);
+
+    wrapper.appendChild(btnRow);
+    containerEl.appendChild(wrapper);
   });
 }
 
-/**
- * Reads the current answer in the DOM for a specific question (via content script).
+/** 
+ * Tells the content script to expand the relevant section and scroll to the question. 
+ */
+function scrollToQuestion(q) {
+  getActiveTabId().then((tabId) => {
+    chrome.tabs.sendMessage(tabId, {
+      action: 'SCROLL_TO_QUESTION',
+      data: q
+    }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.error('[sidepanel.js] SCROLL_TO_QUESTION error:', chrome.runtime.lastError.message);
+      } else {
+        console.log('[sidepanel.js] SCROLL_TO_QUESTION result:', response);
+      }
+    });
+  });
+}
+
+/** 
+ * Grab the current answer in the DOM for a specific question. 
  */
 function grabQuestionAnswer(question) {
   return new Promise((resolve) => {
     getActiveTabId().then((tabId) => {
       chrome.tabs.sendMessage(tabId, { action: 'GRAB_ANSWER', data: question }, (response) => {
         if (chrome.runtime.lastError) {
-          console.error('Error grabbing question answer:', chrome.runtime.lastError.message);
+          console.error('[sidepanel.js] Error grabbing question:', chrome.runtime.lastError.message);
           resolve('');
         } else {
           resolve(response?.answer || '');
@@ -181,29 +183,29 @@ function grabQuestionAnswer(question) {
   });
 }
 
-/**
- * Fills the DOM’s input fields for this question with the userAnswer (via content script).
+/** 
+ * Push the userAnswer to the OneTrust page for this question. 
  */
 function pushQuestionAnswer(question) {
   getActiveTabId().then((tabId) => {
     chrome.tabs.sendMessage(tabId, { action: 'PUSH_ANSWER', data: question }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error('Error pushing question answer:', chrome.runtime.lastError.message);
+        console.error('[sidepanel.js] Error pushing answer:', chrome.runtime.lastError.message);
       } else {
-        console.log('Push done:', response);
+        console.log('[sidepanel.js] Pushed answer:', response);
       }
     });
   });
 }
 
 /** 
- * Helper to get the active tab ID (so we can message the content script). 
+ * Helper to get the active tab ID. 
  */
 function getActiveTabId() {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || !tabs.length) {
-        console.error('[sidepanel.js] No active tabs found.');
+        console.error('[sidepanel.js] No active tab found.');
         resolve(null);
       } else {
         resolve(tabs[0].id);

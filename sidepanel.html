@@ -1,41 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <title>One Trust Companion</title>
   <!-- Tailwind (or your own styles) -->
   <link rel="stylesheet" href="styles/tailwind.min.css" />
   <style>
-    /* Minimal local styling for collapsible sections */
-    .section-header {
-      cursor: pointer;
-      margin: 0.5rem 0;
-      padding: 0.5rem;
-      background-color: #f2f2f2;
-      border-radius: 4px;
-    }
-
-    .section-content {
-      padding-left: 1rem;
-      margin-bottom: 1rem;
-    }
-
-    .question-item {
-      margin: 0.5rem 0;
-      border: 1px solid #ddd;
-      padding: 0.5rem;
-      border-radius: 4px;
-    }
-
-    /* Modal backdrop & container */
+    /* Minimal local styling */
     #jsonModal {
-      display: none;
-      /* hidden by default */
+      display: none; /* hidden by default */
     }
   </style>
 </head>
-
 <body class="p-2">
   <h1 class="text-xl font-bold mb-4">One Trust Companion</h1>
 
@@ -43,28 +19,37 @@
     <button id="btnScrape" class="bg-blue-600 text-white px-2 py-1 rounded">
       Scrape All Sections
     </button>
-    <button id="btnExpandAll" class="bg-gray-600 text-white px-3 py-1 rounded">
-      Expand/Collapse All
-    </button>
-    <button id="btnShowJSON" class="bg-purple-600 text-white px-3 py-1 rounded">
+    <button id="btnShowJSON" class="bg-purple-600 text-white px-2 py-1 rounded">
       See the JSON
     </button>
   </div>
 
-  <!-- Where the hierarchical data will be rendered -->
-  <div id="sectionsContainer"></div>
+  <!-- Container where we list all questions -->
+  <div id="questionsContainer" class="space-y-2"></div>
 
   <!-- JSON Modal (hidden by default) -->
-  <div id="jsonModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+  <div 
+    id="jsonModal" 
+    class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+  >
     <div class="bg-white p-4 rounded shadow-lg w-3/4 max-w-2xl">
-      <h2 class="text-lg font-bold mb-2">Sections Data</h2>
-      <small class="text-gray-500">You need to scrape all sections first</small>
-      <pre id="jsonOutput" class="overflow-auto max-h-96 p-2 border bg-gray-50 text-sm"></pre>
+      <h2 class="text-lg font-bold mb-2">All Questions (Flattened)</h2>
+      <small class="text-gray-500">Scrape first to see data</small>
+      <pre 
+        id="jsonOutput" 
+        class="overflow-auto max-h-96 p-2 border bg-gray-50 text-sm"
+      ></pre>
       <div class="flex justify-end gap-2 mt-2">
-        <button id="btnCopyJson" class="bg-blue-500 text-white px-3 py-1 rounded">
+        <button 
+          id="btnCopyJson"
+          class="bg-blue-500 text-white px-3 py-1 rounded"
+        >
           Copy JSON
         </button>
-        <button id="btnCloseModal" class="bg-red-500 text-white px-3 py-1 rounded">
+        <button 
+          id="btnCloseModal" 
+          class="bg-red-500 text-white px-3 py-1 rounded"
+        >
           Close
         </button>
       </div>
@@ -74,5 +59,4 @@
   <!-- JS for the side panel -->
   <script src="scripts/sidepanel.js"></script>
 </body>
-
 </html>

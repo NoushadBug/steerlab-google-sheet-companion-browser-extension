@@ -1,3 +1,24 @@
+// Listen for URL updates and enable side panel only for Google Sheets
+chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
+  if (!tab.url) return;
+
+  const url = new URL(tab.url);
+  if (url.hostname.includes('onetrust.com')) {
+    // Enable side panel for Google Sheets
+    await chrome.sidePanel.setOptions({
+      tabId,
+      path: 'sidepanel.html',
+      enabled: true
+    });
+  } else {
+    // Disable the side panel on all other sites
+    await chrome.sidePanel.setOptions({
+      tabId,
+      enabled: false
+    });
+  }
+});
+
 chrome.runtime.onInstalled.addListener(() => {
   // Set up behavior to open the side panel on clicking the extension icon
   chrome.sidePanel.setPanelBehavior({
@@ -37,7 +58,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Forward recognized actions to the content script
-  if (['SCRAPE_SECTIONS', 'GRAB_ANSWER', 'PUSH_ANSWER'].includes(action)) {
+  if (['SCRAPE_SECTIONS', 'GRAB_ANSWER', 'PUSH_ANSWER', 'SCROLL_TO_QUESTION'].includes(action)) {
     chrome.tabs.sendMessage(tabId, { action, data }, (response) => {
       // Relay the content script’s response
       if (chrome.runtime.lastError) {
