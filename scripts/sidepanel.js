@@ -1,3 +1,5 @@
+// sidepanel.js
+
 let flatQuestions = [];
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCloseModal = document.getElementById('btnCloseModal');
   const btnCopyJson = document.getElementById('btnCopyJson');
 
-  // Click: Scrape all sections
+  // 1) Scrape all sections
   btnScrape.addEventListener('click', () => {
     getActiveTabId().then((tabId) => {
       chrome.tabs.sendMessage(tabId, { action: 'SCRAPE_SECTIONS' }, (response) => {
@@ -19,22 +21,21 @@ document.addEventListener('DOMContentLoaded', () => {
           console.error('[sidepanel.js] Error contacting content script:', chrome.runtime.lastError.message);
           return;
         }
-        console.log('[sidepanel.js] SCRAPE_SECTIONS response:', response);
-
         if (!Array.isArray(response)) {
           console.error('[sidepanel.js] Did not receive an array of sections:', response);
           return;
         }
 
-        // Flatten the data
+        // Flatten
         flatQuestions = [];
         response.forEach((section, sIdx) => {
           section.questions.forEach((q) => {
             flatQuestions.push({
               ...q,
-              sectionIndex: sIdx,             // for opening correct section
+              sectionIndex: sIdx,
               sectionName: section.sectionName,
-              userAnswer: ''                  // local text area
+              // userAnswer can be string or array, depending on type
+              userAnswer: (q.answerType === 'multichoice') ? [] : ''
             });
           });
         });
@@ -44,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Show JSON
+  // 2) Show JSON
   btnShowJSON.addEventListener('click', () => {
     const jsonStr = JSON.stringify(flatQuestions, null, 2);
     jsonOutput.textContent = jsonStr;
@@ -67,29 +68,26 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Renders the entire question list in a flat format. 
- * Each question has:
- * - A "Go to" button (or clickable text) to open/scroll in OneTrust
- * - A textarea for the local userAnswer
- * - "Grab from Page" / "Push to Page" buttons
+ * Renders each question. 
+ * - For 'button', we show a <select>.
+ * - For 'multichoice', we show multiple checkboxes.
+ * - For 'input_text', 'rich_text', etc., we keep a textarea.
  */
 function renderQuestions(questions, containerEl) {
   containerEl.innerHTML = '';
 
-  questions.forEach((q, i) => {
-    // Wrapper for each question
+  questions.forEach((q) => {
     const wrapper = document.createElement('div');
-    wrapper.className = 'border rounded p-3 bg-gray-50';
+    wrapper.className = 'border rounded p-3 bg-gray-50 mb-2';
 
-    // Title row with a "Go to" button
+    // Title row with "Go to" button
     const titleRow = document.createElement('div');
     titleRow.className = 'flex items-center justify-between mb-2';
 
     const titleText = document.createElement('div');
     titleText.className = 'font-semibold';
-    titleText.textContent = `Q${q.questionDisplayNumber}: ${q.questionText}`;
+    titleText.textContent = `#${q.questionDisplayNumber}: ${q.questionText}`;
 
-    // "Go To" button
     const btnGoTo = document.createElement('button');
     btnGoTo.className = 'bg-blue-400 text-white px-2 py-1 rounded';
     btnGoTo.textContent = 'Go to';
@@ -101,23 +99,41 @@ function renderQuestions(questions, containerEl) {
     titleRow.appendChild(btnGoTo);
     wrapper.appendChild(titleRow);
 
-    // Show section name or questionId if you like
+    // Meta info
     const meta = document.createElement('div');
     meta.className = 'text-sm text-gray-500 mb-2';
-    meta.textContent = `Section: ${q.sectionName} | ID: ${q.questionId} | Type: ${q.answerType || 'N/A'}`;
+    meta.textContent = `Type: ${q.answerType} | ID: ${q.questionId}`;
     wrapper.appendChild(meta);
 
-    // Textarea for the user's typed answer
-    const inputEl = document.createElement('textarea');
-    inputEl.className = 'w-full border rounded p-1 mb-2';
-    inputEl.setAttribute('rows', '2');
-    inputEl.value = q.userAnswer || '';
-    inputEl.addEventListener('input', (e) => {
-      q.userAnswer = e.target.value;
-    });
-    wrapper.appendChild(inputEl);
+    // Decide how to render the "input" area
+    let inputContainer;
+    if (q.answerType === 'button') {
+      // We'll show a <select> for the button options
+      inputContainer = document.createElement('select');
+      inputContainer.className = 'border rounded p-1 mb-2';
+      // We'll fill it after "Grab from Page" (since we learn the buttonOptions then)
+    }
+    else if (q.answerType === 'multichoice') {
+      // We'll create a div that will hold the checkboxes
+      inputContainer = document.createElement('div');
+      inputContainer.className = 'mb-2 flex flex-col gap-1';
+      // We'll fill it after "Grab from Page" (since we need multiChoiceOptions)
+    }
+    else {
+      // For input_text, rich_text, unknown => use a <textarea>
+      inputContainer = document.createElement('textarea');
+      inputContainer.className = 'w-full border rounded p-1 mb-2';
+      inputContainer.setAttribute('rows', '2');
+      // Set the initial value
+      inputContainer.value = typeof q.userAnswer === 'string' ? q.userAnswer : '';
+      inputContainer.addEventListener('input', (e) => {
+        q.userAnswer = e.target.value;
+      });
+    }
 
-    // Button row: "Grab" / "Push"
+    wrapper.appendChild(inputContainer);
+
+    // Button row: Grab / Push
     const btnRow = document.createElement('div');
     btnRow.className = 'flex space-x-2';
 
@@ -126,9 +142,67 @@ function renderQuestions(questions, containerEl) {
     btnGrab.textContent = 'Grab from Page';
     btnGrab.className = 'bg-yellow-400 px-2 py-1 rounded';
     btnGrab.addEventListener('click', () => {
-      grabQuestionAnswer(q).then(answer => {
-        q.userAnswer = answer;
-        inputEl.value = answer;
+      grabQuestionAnswer(q).then((resp) => {
+        // 'resp' can differ by type
+        if (q.answerType === 'button') {
+          // Example: { answer: "No", buttonOptions: ["Yes","No"] }
+          inputContainer.innerHTML = ''; // clear old <option>
+          if (resp.buttonOptions) {
+            resp.buttonOptions.forEach(opt => {
+              const optionEl = document.createElement('option');
+              optionEl.value = opt;
+              optionEl.textContent = opt;
+              inputContainer.appendChild(optionEl);
+            });
+          }
+          inputContainer.value = resp.answer || '';
+          q.userAnswer = resp.answer || '';
+        }
+        else if (q.answerType === 'multichoice') {
+          // Example: { answer: ['Opt1','Opt2'], multiChoiceOptions: ['Opt1','Opt2','Opt3'] }
+          inputContainer.innerHTML = ''; // clear old checkboxes
+          if (Array.isArray(resp.multiChoiceOptions)) {
+            resp.multiChoiceOptions.forEach(opt => {
+              const label = document.createElement('label');
+              label.className = 'inline-flex items-center space-x-1';
+
+              const cb = document.createElement('input');
+              cb.type = 'checkbox';
+              cb.value = opt;
+              cb.checked = Array.isArray(resp.answer) && resp.answer.includes(opt);
+
+              // Keep local userAnswer updated
+              cb.addEventListener('change', () => {
+                // If checked => add to q.userAnswer array
+                // If unchecked => remove from array
+                if (!Array.isArray(q.userAnswer)) {
+                  q.userAnswer = [];
+                }
+                if (cb.checked) {
+                  if (!q.userAnswer.includes(opt)) {
+                    q.userAnswer.push(opt);
+                  }
+                } else {
+                  q.userAnswer = q.userAnswer.filter(x => x !== opt);
+                }
+              });
+
+              const txtSpan = document.createElement('span');
+              txtSpan.textContent = opt;
+
+              label.appendChild(cb);
+              label.appendChild(txtSpan);
+              inputContainer.appendChild(label);
+            });
+          }
+          // set the initial local userAnswer array
+          q.userAnswer = Array.isArray(resp.answer) ? [...resp.answer] : [];
+        }
+        else {
+          // For input_text, rich_text => resp.answer is a string
+          inputContainer.value = resp.answer || '';
+          q.userAnswer = resp.answer || '';
+        }
       });
     });
     btnRow.appendChild(btnGrab);
@@ -147,9 +221,7 @@ function renderQuestions(questions, containerEl) {
   });
 }
 
-/** 
- * Tells the content script to expand the relevant section and scroll to the question. 
- */
+/** Scroll to the question in OneTrust page. */
 function scrollToQuestion(q) {
   getActiveTabId().then((tabId) => {
     chrome.tabs.sendMessage(tabId, {
@@ -157,35 +229,31 @@ function scrollToQuestion(q) {
       data: q
     }, (response) => {
       if (chrome.runtime.lastError) {
-        console.error('[sidepanel.js] SCROLL_TO_QUESTION error:', chrome.runtime.lastError.message);
+        console.error('[sidepanel.js] scrollToQuestion error:', chrome.runtime.lastError.message);
       } else {
-        console.log('[sidepanel.js] SCROLL_TO_QUESTION result:', response);
+        console.log('[sidepanel.js] scrollToQuestion result:', response);
       }
     });
   });
 }
 
-/** 
- * Grab the current answer in the DOM for a specific question. 
- */
+/** Grab the current answer (and possible options if 'button' or 'multichoice'). */
 function grabQuestionAnswer(question) {
   return new Promise((resolve) => {
     getActiveTabId().then((tabId) => {
       chrome.tabs.sendMessage(tabId, { action: 'GRAB_ANSWER', data: question }, (response) => {
         if (chrome.runtime.lastError) {
           console.error('[sidepanel.js] Error grabbing question:', chrome.runtime.lastError.message);
-          resolve('');
+          resolve({ answer: '' });
         } else {
-          resolve(response?.answer || '');
+          resolve(response || { answer: '' });
         }
       });
     });
   });
 }
 
-/** 
- * Push the userAnswer to the OneTrust page for this question. 
- */
+/** Push the user's selection/answer to OneTrust. */
 function pushQuestionAnswer(question) {
   getActiveTabId().then((tabId) => {
     chrome.tabs.sendMessage(tabId, { action: 'PUSH_ANSWER', data: question }, (response) => {
@@ -198,9 +266,7 @@ function pushQuestionAnswer(question) {
   });
 }
 
-/** 
- * Helper to get the active tab ID. 
- */
+/** Get the active tab. */
 function getActiveTabId() {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
