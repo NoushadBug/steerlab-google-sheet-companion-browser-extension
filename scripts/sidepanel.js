@@ -142,68 +142,73 @@ function renderQuestions(questions, containerEl) {
     btnGrab.textContent = 'Grab from Page';
     btnGrab.className = 'bg-yellow-400 px-2 py-1 rounded';
     btnGrab.addEventListener('click', () => {
-      grabQuestionAnswer(q).then((resp) => {
-        // 'resp' can differ by type
-        if (q.answerType === 'button') {
-          // Example: { answer: "No", buttonOptions: ["Yes","No"] }
-          inputContainer.innerHTML = ''; // clear old <option>
-          if (resp.buttonOptions) {
-            resp.buttonOptions.forEach(opt => {
-              const optionEl = document.createElement('option');
-              optionEl.value = opt;
-              optionEl.textContent = opt;
-              inputContainer.appendChild(optionEl);
-            });
-          }
-          inputContainer.value = resp.answer || '';
-          q.userAnswer = resp.answer || '';
+      scrollToQuestion(q, (success) => {
+        if (!success) {
+          console.error('[sidepanel.js] Failed to scroll, not grabbing.');
+          return;
         }
-        else if (q.answerType === 'multichoice') {
-          // Example: { answer: ['Opt1','Opt2'], multiChoiceOptions: ['Opt1','Opt2','Opt3'] }
-          inputContainer.innerHTML = ''; // clear old checkboxes
-          if (Array.isArray(resp.multiChoiceOptions)) {
-            resp.multiChoiceOptions.forEach(opt => {
-              const label = document.createElement('label');
-              label.className = 'inline-flex items-center space-x-1';
-
-              const cb = document.createElement('input');
-              cb.type = 'checkbox';
-              cb.value = opt;
-              cb.checked = Array.isArray(resp.answer) && resp.answer.includes(opt);
-
-              // Keep local userAnswer updated
-              cb.addEventListener('change', () => {
-                // If checked => add to q.userAnswer array
-                // If unchecked => remove from array
-                if (!Array.isArray(q.userAnswer)) {
-                  q.userAnswer = [];
-                }
-                if (cb.checked) {
-                  if (!q.userAnswer.includes(opt)) {
-                    q.userAnswer.push(opt);
-                  }
-                } else {
-                  q.userAnswer = q.userAnswer.filter(x => x !== opt);
-                }
+        // If scrolling succeeded, then do the "grabQuestionAnswer" part:
+        grabQuestionAnswer(q).then((resp) => {
+          if (q.answerType === 'button') {
+            // Example: { answer: "No", buttonOptions: ["Yes","No"] }
+            inputContainer.innerHTML = ''; // clear old <option>
+            if (resp.buttonOptions) {
+              resp.buttonOptions.forEach(opt => {
+                const optionEl = document.createElement('option');
+                optionEl.value = opt;
+                optionEl.textContent = opt;
+                inputContainer.appendChild(optionEl);
               });
-
-              const txtSpan = document.createElement('span');
-              txtSpan.textContent = opt;
-
-              label.appendChild(cb);
-              label.appendChild(txtSpan);
-              inputContainer.appendChild(label);
-            });
+            }
+            inputContainer.value = resp.answer || '';
+            q.userAnswer = resp.answer || '';
           }
-          // set the initial local userAnswer array
-          q.userAnswer = Array.isArray(resp.answer) ? [...resp.answer] : [];
-        }
-        else {
-          // For input_text, rich_text => resp.answer is a string
-          inputContainer.value = resp.answer || '';
-          q.userAnswer = resp.answer || '';
-        }
+          else if (q.answerType === 'multichoice') {
+            // Example: { answer: ['Opt1','Opt2'], multiChoiceOptions: ['Opt1','Opt2','Opt3'] }
+            inputContainer.innerHTML = ''; // clear old checkboxes
+            if (Array.isArray(resp.multiChoiceOptions)) {
+              resp.multiChoiceOptions.forEach(opt => {
+                const label = document.createElement('label');
+                label.className = 'inline-flex items-center space-x-1';
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = opt;
+                cb.checked = Array.isArray(resp.answer) && resp.answer.includes(opt);
+
+                // Keep local userAnswer updated
+                cb.addEventListener('change', () => {
+                  if (!Array.isArray(q.userAnswer)) {
+                    q.userAnswer = [];
+                  }
+                  if (cb.checked) {
+                    if (!q.userAnswer.includes(opt)) {
+                      q.userAnswer.push(opt);
+                    }
+                  } else {
+                    q.userAnswer = q.userAnswer.filter(x => x !== opt);
+                  }
+                });
+
+                const txtSpan = document.createElement('span');
+                txtSpan.textContent = opt;
+
+                label.appendChild(cb);
+                label.appendChild(txtSpan);
+                inputContainer.appendChild(label);
+              });
+            }
+            // set the initial local userAnswer array
+            q.userAnswer = Array.isArray(resp.answer) ? [...resp.answer] : [];
+          }
+          else {
+            // For input_text, rich_text => resp.answer is a string
+            inputContainer.value = resp.answer || '';
+            q.userAnswer = resp.answer || '';
+          }
+        });
       });
+
     });
     btnRow.appendChild(btnGrab);
 
@@ -222,7 +227,7 @@ function renderQuestions(questions, containerEl) {
 }
 
 /** Scroll to the question in OneTrust page. */
-function scrollToQuestion(q) {
+function scrollToQuestion(q, callback = () => { }) {
   getActiveTabId().then((tabId) => {
     chrome.tabs.sendMessage(tabId, {
       action: 'SCROLL_TO_QUESTION',
@@ -230,8 +235,10 @@ function scrollToQuestion(q) {
     }, (response) => {
       if (chrome.runtime.lastError) {
         console.error('[sidepanel.js] scrollToQuestion error:', chrome.runtime.lastError.message);
+        callback(false);
       } else {
         console.log('[sidepanel.js] scrollToQuestion result:', response);
+        callback(true);
       }
     });
   });
