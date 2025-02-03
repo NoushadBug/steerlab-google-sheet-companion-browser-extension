@@ -146,6 +146,7 @@ function renderQuestions(questions, containerEl) {
 
     const titleText = document.createElement('div');
     titleText.className = 'font-semibold';
+    titleText.style.width = '85%';
     titleText.textContent = `#${q.questionDisplayNumber}: ${q.questionText}`;
 
     const btnGoTo = document.createElement('button');
@@ -161,7 +162,7 @@ function renderQuestions(questions, containerEl) {
 
     // Meta info
     const meta = document.createElement('div');
-    meta.className = 'text-sm text-gray-500 mb-2';
+    meta.className = 'text-xm text-gray-500 mb-2';
     meta.textContent = `Type: ${q.answerType} | ID: ${q.questionId}`;
     wrapper.appendChild(meta);
 
@@ -222,6 +223,9 @@ function renderQuestions(questions, containerEl) {
         });
       }
     }
+    else if (q.answerType === 'unknown') {
+
+    }
     else {
       // For input_text, rich_text, unknown => use a <textarea>
       inputContainer = document.createElement('textarea');
@@ -239,9 +243,9 @@ function renderQuestions(questions, containerEl) {
     const btnRow = document.createElement('div');
     btnRow.className = 'flex space-x-2';
 
-    // "Grab from Page" button (manual refresh of this question)
+    // "Get Data" button (manual refresh of this question)
     const btnGrab = document.createElement('button');
-    btnGrab.textContent = 'Grab from Page';
+    btnGrab.textContent = 'Get Data';
     btnGrab.className = 'bg-yellow-400 px-2 py-1 rounded';
     btnGrab.addEventListener('click', () => {
       scrollToQuestion(q, (success) => {
@@ -308,9 +312,9 @@ function renderQuestions(questions, containerEl) {
     });
     btnRow.appendChild(btnGrab);
 
-    // "Push to Page" button
+    // "Set Data" button
     const btnPush = document.createElement('button');
-    btnPush.textContent = 'Push to Page';
+    btnPush.textContent = 'Set Data';
     btnPush.className = 'bg-green-500 text-white px-2 py-1 rounded';
     btnPush.addEventListener('click', () => {
       scrollToQuestion(q, (success) => {
