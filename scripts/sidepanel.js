@@ -13,10 +13,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnCloseModal = document.getElementById('btnCloseModal');
   const btnCopyJson = document.getElementById('btnCopyJson');
 
-  // 1) Scrape all sections
+  // 1) Scrape all sections (now using SCRAPE_SECTIONS_WITH_ANSWERS)
   btnScrape.addEventListener('click', () => {
     getActiveTabId().then((tabId) => {
-      chrome.tabs.sendMessage(tabId, { action: 'SCRAPE_SECTIONS' }, async (response) => {
+      chrome.tabs.sendMessage(tabId, { action: 'SCRAPE_SECTIONS_WITH_ANSWERS' }, (response) => {
         if (chrome.runtime.lastError) {
           console.error('[sidepanel.js] Error contacting content script:', chrome.runtime.lastError.message);
           return;
@@ -26,31 +26,56 @@ document.addEventListener('DOMContentLoaded', () => {
           return;
         }
 
-        // Flatten
+        // Flatten the returned sections into one array of questions
         flatQuestions = [];
         response.forEach((section, sIdx) => {
           section.questions.forEach((q) => {
+            // q.answer might be an object like { answer, multiChoiceOptions, buttonOptions } 
+            // depending on your content script's shape. 
+            // If your content script merges it differently, adjust here as needed.
+            
+            // Typically we do:
+            //  userAnswer = q.answer.answer (if it's text or array),
+            //  multiChoiceOptions = q.answer.multiChoiceOptions, etc.
+
+            // For convenience, let's unify some fields:
+            let userAnswer = '';
+            let buttonOptions = [];
+            let multiChoiceOptions = [];
+
+            if (q.answerType === 'button' && q.answer?.buttonOptions) {
+              buttonOptions = q.answer.buttonOptions;
+              userAnswer = q.answer.answer || '';
+            }
+            else if (q.answerType === 'multichoice' && q.answer) {
+              multiChoiceOptions = q.answer.multiChoiceOptions || [];
+              // 'answer' might be an array
+              userAnswer = Array.isArray(q.answer.answer) ? [...q.answer.answer] : [];
+            }
+            else {
+              // input_text, rich_text, or unknown => just store the string in .answer
+              userAnswer = (typeof q.answer?.answer === 'string') ? q.answer.answer : '';
+            }
+
             flatQuestions.push({
               ...q,
+              // if you want, you can store the entire `q.answer` object somewhere else
               sectionIndex: sIdx,
               sectionName: section.sectionName,
-              // userAnswer can be string or array, depending on type
-              userAnswer: (q.answerType === 'multichoice') ? [] : ''
-              // Note: buttonOptions and multiChoiceOptions will be added by autoGrabAll.
+              userAnswer,
+              buttonOptions,
+              multiChoiceOptions
             });
           });
         });
 
-        // Automatically grab answers following the workflow:
-        //   For each section, scroll to the first question then grab every answer.
-        await autoGrabAll(flatQuestions);
-
+        // Render (no autoGrabAll step needed anymore!)
         renderQuestions(flatQuestions, questionsContainer);
       });
     });
   });
 
-  // 2) Show JSON
+  // 2) Show JSON in a modal
   btnShowJSON.addEventListener('click', () => {
     const jsonStr = JSON.stringify(flatQuestions, null, 2);
     jsonOutput.textContent = jsonStr;
@@ -73,65 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * Automatically grabs the current OneTrust answers for each question 
- * and stores them in the question objects.
- *
- * Workflow:
- *   - Group questions by sectionIndex.
- *   - For each section:
- *       1. Scroll to the first question (to expand the section).
- *       2. Iterate over every question in that section and grab its answer.
- */
-async function autoGrabAll(questions) {
-  // Group questions by sectionIndex
-  const sections = {};
-  questions.forEach(q => {
-    if (!sections[q.sectionIndex]) {
-      sections[q.sectionIndex] = [];
-    }
-    sections[q.sectionIndex].push(q);
-  });
-
-  // Process each section sequentially
-  for (const sectionIndex in sections) {
-    const sectionQuestions = sections[sectionIndex];
-    const firstQuestion = sectionQuestions[0];
-
-    // Scroll to the first question in the section to "open" it
-    await new Promise((resolve) => {
-      scrollToQuestion(firstQuestion, (success) => {
-        if (!success) {
-          console.error(`[autoGrabAll] Failed to scroll to question in section ${sectionIndex}`);
-        }
-        resolve();
-      });
-    });
-
-    // Now grab answers for every question in this section
-    for (const q of sectionQuestions) {
-      const resp = await grabQuestionAnswer(q);
-
-      if (q.answerType === 'button') {
-        // Example: { answer: "No", buttonOptions: ["Yes","No"] }
-        q.buttonOptions = resp.buttonOptions || [];
-        q.userAnswer = resp.answer || '';
-      } else if (q.answerType === 'multichoice') {
-        // Example: { answer: ['Opt1','Opt2'], multiChoiceOptions: ['Opt1','Opt2','Opt3'] }
-        q.multiChoiceOptions = resp.multiChoiceOptions || [];
-        q.userAnswer = Array.isArray(resp.answer) ? [...resp.answer] : [];
-      } else {
-        // input_text, rich_text, unknown => just store string
-        q.userAnswer = resp.answer || '';
-      }
-    }
-  }
-}
-
-/**
- * Renders each question.
- * - For 'button', we show a <select> populated with q.buttonOptions (if available).
- * - For 'multichoice', we show multiple checkboxes built from q.multiChoiceOptions.
- * - For 'input_text', 'rich_text', etc., we use a <textarea>.
+ * Renders each question in the side panel. 
+ * (Unchanged from your original, except we rely on the 
+ * data that your content script already returned.)
  */
 function renderQuestions(questions, containerEl) {
   containerEl.innerHTML = '';
@@ -169,7 +138,6 @@ function renderQuestions(questions, containerEl) {
     // Decide how to render the "input" area
     let inputContainer;
     if (q.answerType === 'button') {
-      // Create a <select> element and populate it if options were auto-grabbed
       inputContainer = document.createElement('select');
       inputContainer.className = 'border rounded p-1 mb-2';
       if (Array.isArray(q.buttonOptions) && q.buttonOptions.length > 0) {
@@ -179,7 +147,6 @@ function renderQuestions(questions, containerEl) {
           optionEl.textContent = opt;
           inputContainer.appendChild(optionEl);
         });
-        // Set the current selection if available
         inputContainer.value = q.userAnswer || '';
       }
       inputContainer.addEventListener('change', (e) => {
@@ -187,7 +154,6 @@ function renderQuestions(questions, containerEl) {
       });
     }
     else if (q.answerType === 'multichoice') {
-      // Create a container div for checkboxes; if options were auto-grabbed, render them
       inputContainer = document.createElement('div');
       inputContainer.className = 'mb-2 flex flex-col gap-1';
       if (Array.isArray(q.multiChoiceOptions) && q.multiChoiceOptions.length > 0) {
@@ -201,6 +167,7 @@ function renderQuestions(questions, containerEl) {
           if (Array.isArray(q.userAnswer) && q.userAnswer.includes(opt)) {
             cb.checked = true;
           }
+
           cb.addEventListener('change', () => {
             if (!Array.isArray(q.userAnswer)) {
               q.userAnswer = [];
@@ -216,22 +183,18 @@ function renderQuestions(questions, containerEl) {
 
           const txtSpan = document.createElement('span');
           txtSpan.textContent = opt;
-
           label.appendChild(cb);
           label.appendChild(txtSpan);
           inputContainer.appendChild(label);
         });
       }
     }
-    else if (q.answerType === 'unknown') {
-
-    }
     else {
       // For input_text, rich_text, unknown => use a <textarea>
       inputContainer = document.createElement('textarea');
       inputContainer.className = 'w-full border rounded p-1 mb-2';
       inputContainer.setAttribute('rows', '2');
-      inputContainer.value = typeof q.userAnswer === 'string' ? q.userAnswer : '';
+      inputContainer.value = (typeof q.userAnswer === 'string') ? q.userAnswer : '';
       inputContainer.addEventListener('input', (e) => {
         q.userAnswer = e.target.value;
       });
@@ -239,11 +202,11 @@ function renderQuestions(questions, containerEl) {
 
     wrapper.appendChild(inputContainer);
 
-    // Button row: Grab / Push
+    // Button row: "Get Data" / "Set Data"
     const btnRow = document.createElement('div');
     btnRow.className = 'flex space-x-2';
 
-    // "Get Data" button (manual refresh of this question)
+    // Optional "Get Data" button: manually refresh a single question if desired
     const btnGrab = document.createElement('button');
     btnGrab.textContent = 'Get Data';
     btnGrab.className = 'bg-yellow-400 px-2 py-1 rounded';
@@ -253,10 +216,10 @@ function renderQuestions(questions, containerEl) {
           console.error('[sidepanel.js] Failed to scroll, not grabbing.');
           return;
         }
-        // If scrolling succeeded, grab the question answer
+        // If scrolling succeeded, re-grab the question
         grabQuestionAnswer(q).then((resp) => {
           if (q.answerType === 'button') {
-            inputContainer.innerHTML = ''; // clear old options
+            inputContainer.innerHTML = '';
             if (resp.buttonOptions) {
               resp.buttonOptions.forEach(opt => {
                 const optionEl = document.createElement('option');
@@ -269,7 +232,7 @@ function renderQuestions(questions, containerEl) {
             q.userAnswer = resp.answer || '';
           }
           else if (q.answerType === 'multichoice') {
-            inputContainer.innerHTML = ''; // clear old checkboxes
+            inputContainer.innerHTML = '';
             if (Array.isArray(resp.multiChoiceOptions)) {
               resp.multiChoiceOptions.forEach(opt => {
                 const label = document.createElement('label');
@@ -319,7 +282,8 @@ function renderQuestions(questions, containerEl) {
     btnPush.addEventListener('click', () => {
       scrollToQuestion(q, (success) => {
         if (!success) {
-          console.error(`[autoGrabAll] Failed to scroll to question in section ${sectionIndex}`);
+          console.error('[sidepanel.js] Failed to scroll, not pushing answer.');
+          return;
         }
         pushQuestionAnswer(q);
       });
@@ -331,13 +295,12 @@ function renderQuestions(questions, containerEl) {
   });
 }
 
-/** Scroll to the question in OneTrust page. */
-function scrollToQuestion(q, callback = () => { }) {
+/** 
+ * Scroll to the question in OneTrust page (unchanged).
+ */
+function scrollToQuestion(q, callback = () => {}) {
   getActiveTabId().then((tabId) => {
-    chrome.tabs.sendMessage(tabId, {
-      action: 'SCROLL_TO_QUESTION',
-      data: q
-    }, (response) => {
+    chrome.tabs.sendMessage(tabId, { action: 'SCROLL_TO_QUESTION', data: q }, (response) => {
       if (chrome.runtime.lastError) {
         console.error('[sidepanel.js] scrollToQuestion error:', chrome.runtime.lastError.message);
         callback(false);
@@ -349,7 +312,10 @@ function scrollToQuestion(q, callback = () => { }) {
   });
 }
 
-/** Grab the current answer (and possible options if 'button' or 'multichoice'). */
+/** 
+ * Grab the current answer (and possible options if 'button' or 'multichoice').
+ * Remains for manual refreshing a single question if needed.
+ */
 function grabQuestionAnswer(question) {
   return new Promise((resolve) => {
     getActiveTabId().then((tabId) => {
@@ -365,7 +331,9 @@ function grabQuestionAnswer(question) {
   });
 }
 
-/** Push the user's selection/answer to OneTrust. */
+/**
+ * Push the user's selection/answer to OneTrust.
+ */
 function pushQuestionAnswer(question) {
   getActiveTabId().then((tabId) => {
     chrome.tabs.sendMessage(tabId, { action: 'PUSH_ANSWER', data: question }, (response) => {
@@ -378,7 +346,9 @@ function pushQuestionAnswer(question) {
   });
 }
 
-/** Get the active tab. */
+/**
+ * Helper to get the active tab.
+ */
 function getActiveTabId() {
   return new Promise((resolve) => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {

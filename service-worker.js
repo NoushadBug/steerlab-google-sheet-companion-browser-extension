@@ -58,7 +58,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   // Forward recognized actions to the content script
-  if (['SCRAPE_SECTIONS', 'GRAB_ANSWER', 'PUSH_ANSWER', 'SCROLL_TO_QUESTION'].includes(action)) {
+  if (['SCRAPE_SECTIONS', 'GRAB_ANSWER','SCRAPE_SECTIONS_WITH_ANSWERS', 'PUSH_ANSWER', 'SCROLL_TO_QUESTION'].includes(action)) {
     chrome.tabs.sendMessage(tabId, { action, data }, (response) => {
       // Relay the content script’s response
       if (chrome.runtime.lastError) {
@@ -84,7 +84,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
  */
 function validateRequest(action, data) {
   // 1. Check if action is recognized
-  const allowedActions = ['SCRAPE_SECTIONS', 'GRAB_ANSWER', 'PUSH_ANSWER'];
+  const allowedActions = ['SCRAPE_SECTIONS', 'SCRAPE_SECTIONS_WITH_ANSWERS', 'GRAB_ANSWER', 'PUSH_ANSWER'];
   if (!allowedActions.includes(action)) {
     return `Invalid action: "${action}". Allowed: ${allowedActions.join(', ')}.`;
   }
@@ -92,6 +92,8 @@ function validateRequest(action, data) {
   // 2. Validate data fields for each action
   switch (action) {
     case 'SCRAPE_SECTIONS':
+     break;
+    case 'SCRAPE_SECTIONS_WITH_ANSWERS':
       // Typically no data needed to scrape
       // but if you require a certain flag or format, check it here
       // Example: if (data && data.someFlag !== true) { return 'Missing or invalid someFlag for SCRAPE_SECTIONS.'; }

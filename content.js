@@ -13,6 +13,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true; // async
   }
 
+  if (action === 'SCRAPE_SECTIONS_WITH_ANSWERS') {
+    (async () => {
+      try {
+        const sectionsWithAnswers = await scrapeSectionsWithAnswers();
+        sendResponse(sectionsWithAnswers);
+      } catch (err) {
+        console.error('[content.js] Error scraping sections with answers:', err);
+        sendResponse([]);
+      }
+    })();
+    return true; // async
+  }
+
   if (action === 'SCRAPE_SECTIONS') {
     (async () => {
       try {
@@ -40,6 +53,119 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+/** Main scraping function that also grabs answers. */
+async function scrapeSectionsWithAnswers() {
+  const allSections = [];
+
+  const sectionEls = document.querySelectorAll('.aa-section-list__section');
+  for (let secIndex = 0; secIndex < sectionEls.length; secIndex++) {
+    const secEl = sectionEls[secIndex];
+    const secButton = secEl.querySelector('button');
+    const secName = secButton ? secButton.textContent.trim() : `Section ${secIndex + 1}`;
+
+    if (secButton) {
+      secButton.click();
+      try {
+        await waitUntilLoaded();
+      } catch (err) {
+        console.warn('[content.js] Timed out or failed loading section:', err);
+      }
+    }
+
+    // Gather .aa-question__name
+    const questionNameEls = document.querySelectorAll('.aa-question__name');
+    const questionsArr = [];
+
+    questionNameEls.forEach((qEl) => {
+      const txt = qEl.textContent.trim();
+      const container = qEl.closest('.aa-question__container');
+      const questionId = generateUUID();
+
+      // Check for question display number
+      const numberEl = container.querySelector('.aa-question__number');
+      const questionDisplayNumber = numberEl ? numberEl.textContent.trim() : '';
+
+      const answerType = detectAnswerType(container);
+      const answer = grabAnswerFromContainer(container, answerType);
+
+      questionsArr.push({
+        questionId,
+        questionText: txt,
+        questionDisplayNumber,
+        answerType,
+        sectionId: `${secIndex + 1}`,
+        answer
+      });
+    });
+
+    allSections.push({
+      sectionName: secName,
+      sectionId: `${secIndex + 1}`,
+      questions: questionsArr
+    });
+  }
+
+  return allSections;
+}
+
+/**
+ * Grab the answer from the container based on the answer type.
+ */
+function grabAnswerFromContainer(container, answerType) {
+  switch (answerType) {
+    case 'input_text': {
+      const inputEl = container.querySelector('.vt-input-element');
+      return { answer: inputEl ? inputEl.value : '' };
+    }
+
+    case 'rich_text': {
+      const ql = container.querySelector('[ot-rich-text-editor-element] .ql-editor');
+      return { answer: ql ? ql.innerHTML : '' };
+    }
+
+    case 'multichoice': {
+      const multiEl = container.querySelector('.aa-question__multichoice');
+      if (!multiEl) return { answer: [], multiChoiceOptions: [] };
+
+      const buttonEls = Array.from(multiEl.querySelectorAll('button'));
+      const multiChoiceOptions = buttonEls.map(b => b.textContent.trim());
+      const checkedVals = buttonEls.filter(b =>
+        b.classList.contains('vt-button--primary') || b.getAttribute('aria-pressed') === 'true'
+      ).map(b => b.textContent.trim());
+
+      return {
+        answer: checkedVals,
+        multiChoiceOptions
+      };
+    }
+
+    case 'button': {
+      const buttonRow = container.querySelector('.aa-question__button-row');
+      if (!buttonRow) return { answer: '', buttonOptions: [] };
+
+      const btnEls = Array.from(buttonRow.querySelectorAll('.vt-button'));
+      const options = [];
+      let selectedVal = '';
+
+      btnEls.forEach(b => {
+        const txt = b.textContent.trim();
+        options.push(txt);
+
+        const isSelected = b.classList.contains('vt-button--primary') ||
+          b.getAttribute('aria-pressed') === 'true';
+        if (isSelected) {
+          selectedVal = txt;
+        }
+      });
+
+      return { answer: selectedVal, buttonOptions: options };
+    }
+
+    default:
+      return { answer: '' };
+  }
+}
 
 /** Opens the correct section in OneTrust, waits, then scrolls the question into view. */
 async function openSectionAndScroll(question) {
